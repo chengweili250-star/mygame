@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <!-- 📱 跨平台設定：讓手機點開網址時自動對齊不縮小 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select: none">
+    <title>多元戰爭 - 幾何兵團終極版</title>
+    <style>
+        body { background-color: #222; color: #fff; font-family: sans-serif; text-align: center; user-select: none; margin: 0; padding: 10px; }
+        #game-top-bar { position: fixed; top: 15px; right: 20px; display: flex; align-items: center; gap: 15px; z-index: 999; }
+        #game-timer { background: #444; color: #fff; padding: 8px 15px; font-size: 16px; font-weight: bold; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #battlefield { width: 100%; max-width: 800px; height: 220px; background-color: #333; margin: 20px auto; position: relative; border-bottom: 5px solid #555; overflow: hidden; border-radius: 4px; }
+        #my-base { width: 60px; height: 140px; background-color: #2196F3; position: absolute; bottom: 0; left: 0; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; }
+        #enemy-base { width: 60px; height: 140px; background-color: #f44336; position: absolute; bottom: 0; right: 0; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; }
+        .unit { width: 40px; height: 60px; position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; overflow: visible; }
+        .hp-bar { font-size: 10px; background: rgba(255,255,255,0.9); color: #000; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-bottom: 5px; white-space: nowrap; z-index: 10; }
+        .poly-circle { width: 22px; height: 22px; background-color: #4CAF50; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 8px #4CAF50; }
+        .poly-square { width: 28px; height: 28px; background-color: #00BCD4; border: 2px solid #fff; box-shadow: 0 0 10px #00BCD4; }
+        .poly-rect { width: 30px; height: 40px; background-color: #FFEB3B; border: 2px solid #fff; box-shadow: 0 0 12px #FFEB3B; }
+        .poly-triangle { width: 30px; height: 30px; background-color: #FF5722; border: 1px solid #fff; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .cat-walk { animation: catJump 0.4s infinite alternate ease-in-out; }
+        .dog-walk { animation: dogJump 0.35s infinite alternate ease-in-out; }
+        @keyframes catJump { 0% { transform: translateY(0); } 100% { transform: translateY(-12px); } }
+        @keyframes dogJump { 0% { transform: translateY(0); } 100% { transform: translateY(-10px); } }
+        #controls { display: flex; justify-content: center; gap: 15px; margin-top: 15px; flex-wrap: wrap; max-width: 900px; margin-left: auto; margin-right: auto; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; background: #2b2b2b; padding: 12px; border-radius: 8px; border: 1px solid #444; min-width: 280px; flex: 1; }
+        h3 { margin: 0 0 5px 0; font-size: 16px; color: #FFC107; }
+        .btn-c { border-left: 6px solid #4CAF50 !important; }
+        .btn-s { border-left: 6px solid #00BCD4 !important; }
+        .btn-r { border-left: 6px solid #FFEB3B !important; }
+        button { padding: 10px 12px; font-size: 13px; cursor: pointer; background: #444; color: #fff; border: 2px solid #555; border-radius: 6px; font-weight: bold; text-align: left; }
+        button:hover:not(:disabled) { background: #555; }
+        button:disabled { background: #222; cursor: not-allowed; color: #555; border-color: #333; }
+        .info-board { display: flex; justify-content: center; gap: 25px; font-size: 18px; font-weight: bold; margin: 10px; color: #E0E0E0; }
+        .status-panel { font-size: 11px; color: #bbb; text-align: left; background: #1e1e1e; padding: 6px; border-radius: 4px; line-height: 1.4; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+        #mobile-pause-area { width: 100%; max-width: 600px; margin: 15px auto; padding: 0 10px; box-sizing: border-box; }
+        #btn-mobile-pause { width: 100%; padding: 12px; font-size: 16px; background: #ff9800; color: #fff; border: none; border-radius: 10px; font-weight: bold; box-shadow: 0 5px 0 #e65100; text-align: center; }
+        #btn-mobile-pause:active { transform: translateY(4px); box-shadow: 0 1px 0 #e65100; }
+    </style>
+</head>
+
+<body>
+    <div id="game-top-bar"><div id="game-timer">⏱️ 時間：00:00</div></div>
+    <h1>🔺 多元戰爭：幾何多兵種世代 🟦</h1>
+    <div class="info-board">
+        <div>💰 能量晶體：<span id="money-display">0</span></div>
+        <div>📈 核心：Lv.<span id="wallet-level">1</span> (+<span id="speed-display">50</span>/秒)</div>
+    </div>
+    <div id="battlefield">
+        <div id="my-base"><div>藍方基地</div><div id="my-base-hp">HP: 500</div></div>
+        <div id="enemy-base"><div>紅方基地</div><div id="enemy-base-hp">HP: 500</div></div>
+    </div>
+    <!-- 📱 手機玩家用此按鈕一鍵暫停 -->
+    <div id="mobile-pause-area">
+        <button onclick="togglePause()" id="btn-mobile-pause">⏸️ 點擊暫停 / 繼續遊戲 (空白鍵/P)</button>
+    </div>
+    <div id="controls">
+        <div class="btn-group">
+            <h3>🎛️ 幾何矩陣出兵系統</h3>
+            <button onclick="spawnUnit('circle')" id="btn-cd-circle" class="btn-c">🟩 製造【圓形砲灰】 (花費: 30) <span id="txt-cd-circle"></span></button>
+            <button onclick="spawnUnit('square')" id="btn-cd-square" class="btn-s">🟦 製造【標準方塊】 (花費: 60) <span id="txt-cd-square"></span></button>
+            <button onclick="spawnUnit('rect')" id="btn-cd-rect" class="btn-r">🟨 製造【長方巨兵】 (花費: 150) <span id="txt-cd-rect"></span></button>
+            <div class="status-panel" style="grid-template-columns: 1fr; font-size: 13px; font-weight: bold; background: #111; border: 1px solid #555; padding: 10px;">
+                <span style="color: #4CAF50; margin-bottom: 4px;">🟢 圓形兵 ➡️ 🩸 生命: 25 | ⚔️ 攻擊: 5 | 🏃‍♂️ 移動速度: 2.2 | 📏 攻擊距離: 35px</span>
+                <span style="color: #00BCD4; margin-bottom: 4px;">🔵 正方兵 ➡️ 🩸 生命: 45 | ⚔️ 攻擊: 12 | 🏃‍♂️ 移動速度: 1.4 | 📏 攻擊距離: 55px</span>
+                <span style="color: #FFEB3B;">🟡 長方兵 ➡️ 🩸 生命: 150 | ⚔️ 攻擊: 35 | 🏃‍♂️ 移動速度: 0.7 | 📏 攻擊距離: 120px</span>
+            </div>
+        </div>
+        <div class="btn-group">
+            <h3>⚡ 矩陣科技升級</h3>
+            <button onclick="upgradeWallet()" id="wallet-btn" style="background-color: #FFC107; color: #000; text-align:center;">升級能量核心 (花費 100)</button>
+            <button onclick="upgradeBaseHp()" id="base-hp-btn" style="background-color: #00BCD4; color: #000; text-align:center;">強化我方基底血量 (花費 200)</button>
+        </div>
+    </div>
+
+        <script>
+        let money = 100; let walletLv = 1; let moneyTick = 5; let walletCost = 100;
+        let myBaseHp = 500; let myBaseMaxHp = 500; let baseHpLv = 1; let baseHpCost = 200; let enemyBaseHp = 500;
+        let activeCats = []; let activeDogs = []; let totalSeconds = 0; let isPaused = false;
+        const unitConfigs = {
+            circle: { hp: 25, atk: 5, cost: 30, cd: 1.5, skinClass: 'poly-circle', speed: 2.2, range: 35 },
+            square: { hp: 45, atk: 12, cost: 60, cd: 3.5, skinClass: 'poly-square', speed: 1.4, range: 55 },
+            rect: { hp: 150, atk: 35, cost: 150, cd: 8.0, skinClass: 'poly-rect', speed: 0.7, range: 120 }
+        };
+        const cdStates = { circle: false, square: false, rect: false };
+        const timerDisplay = document.getElementById('game-timer'); const moneyDisplay = document.getElementById('money-display');
+        const walletLevel = document.getElementById('wallet-level'); const speedDisplay = document.getElementById('speed-display');
+        const myBaseHpDisplay = document.getElementById('my-base-hp'); const enemyBaseHpDisplay = document.getElementById('enemy-base-hp');
+        const walletBtn = document.getElementById('wallet-btn'); const baseHpBtn = document.getElementById('base-hp-btn');
+        const battlefield = document.getElementById('battlefield'); const mobilePauseBtn = document.getElementById('btn-mobile-pause');
+
+        window.addEventListener('keydown', (event) => { if (event.code === 'Space' || event.key === 'p' || event.key === 'P') { event.preventDefault(); togglePause(); } });
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) { mobilePauseBtn.innerText = "▶️ 遊戲已暫停，點擊繼續"; mobilePauseBtn.style.background = "#4CAF50"; document.querySelectorAll('.cat-walk, .dog-walk').forEach(el => el.style.animationPlayState = 'paused'); }
+            else { mobilePauseBtn.innerText = "⏸️ 點擊暫停 / 繼續遊戲 (空白鍵/P)"; mobilePauseBtn.style.background = "#ff9800"; document.querySelectorAll('.cat-walk, .dog-walk').forEach(el => el.style.animationPlayState = 'running'); }
+        }
+        setInterval(() => { if (isPaused) return; money += moneyTick; moneyDisplay.innerText = money; }, 100);
+        setInterval(() => { if (isPaused) return; totalSeconds++; let mins = Math.floor(totalSeconds / 60); let secs = totalSeconds % 60; timerDisplay.innerText = `⏱️ 時間：${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`; }, 1000);
+
+        function spawnUnit(type) {
+            if (isPaused) return; const config = unitConfigs[type];
+            if (money >= config.cost && !cdStates[type]) {
+                money -= config.cost; startCooldown(type, config.cd);
+                const uObj = { id: 'u_' + Date.now() + Math.random(), hp: config.hp, atk: config.atk, speed: config.speed, range: config.range, pos: 30, element: document.createElement('div') };
+                uObj.element.className = 'unit'; uObj.element.style.left = uObj.pos + 'px';
+                uObj.element.innerHTML = `<div class="hp-bar">🩸${uObj.hp}</div><div class="${config.skinClass} cat-walk"></div>`;
+                battlefield.appendChild(uObj.element); activeCats.push(uObj);
+            }
+        }
+        function startCooldown(type, cdSec) {
+            cdStates[type] = true; const btn = document.getElementById(`btn-cd-${type}`); const txt = document.getElementById(`txt-cd-${type}`); btn.disabled = true; let remain = cdSec; txt.innerText = `(${remain}s)`;
+            const timer = setInterval(() => { if (isPaused) return; remain = (remain - 0.5).toFixed(1); if (remain <= 0) { clearInterval(timer); cdStates[type] = false; btn.disabled = false; txt.innerText = ''; } else { txt.innerText = `(${remain}s)`; } }, 500);
+        }
+        setInterval(() => {
+            if (isPaused || enemyBaseHp <= 0) return;
+            const dogObj = { id: 'd_' + Date.now() + Math.random(), hp: 45, atk: 10, pos: 720, speed: 1.5, range: 35, element: document.createElement('div') };
+            dogObj.element.className = 'unit'; dogObj.element.style.left = dogObj.pos + 'px';
+            dogObj.element.innerHTML = `<div class="hp-bar">🩸${dogObj.hp}</div><div class="poly-triangle dog-walk"></div>`;
+            battlefield.appendChild(dogObj.element); activeDogs.push(dogObj);
+        }, 4000);
+
+        // ⚔️ 融合歷史所有改進的超級物理對戰引擎
+        setInterval(() => {
+            if (isPaused) return;
+            activeCats.forEach((cat) => {
+                let enemiesAhead = activeDogs.filter(dog => dog.pos > cat.pos).sort((a, b) => a.pos - b.pos);
+                let closestEnemy = enemiesAhead.length > 0 ? enemiesAhead : null;
+                let isEnemyInRange = closestEnemy && (closestEnemy.pos - cat.pos <= cat.range);
+                let isBaseInRange = (715 - cat.pos <= cat.range * 0.75); // 打塔自動貼近0.75倍
+
+                if (isEnemyInRange && closestEnemy) {
+                    if (!cat.lastAtkTime || Date.now() - cat.lastAtkTime > 1000) {
+                        closestEnemy.hp -= cat.atk; if (closestEnemy.hp <= 0) closestEnemy.hp = 0;
+                        closestEnemy.element.querySelector('.hp-bar').innerText = `🩸${closestEnemy.hp}`; cat.lastAtkTime = Date.now();
+                    }
+                } else if (!isEnemyInRange && cat.pos < 715) {
+                    cat.pos += cat.speed; cat.element.style.left = cat.pos + 'px'; // 自己人完全自由穿透超車
+                } else if (activeDogs.length === 0 && isBaseInRange) {
+                    if (!cat.lastAtkTime || Date.now() - cat.lastAtkTime > 1000) {
+                        enemyBaseHp -= cat.atk; if (enemyBaseHp < 0) enemyBaseHp = 0; enemyBaseHpDisplay.innerText = `HP: ${enemyBaseHp}`; cat.lastAtkTime = Date.now(); checkGameOver();
+                    }
+                }
+            });
+            activeDogs.forEach((dog) => {
+                let enemiesAhead = activeCats.filter(cat => cat.pos < dog.pos).sort((a, b) => b.pos - a.pos);
+                let closestEnemy = enemiesAhead.length > 0 ? enemiesAhead : null;
+                let isEnemyInRange = closestEnemy && (dog.pos - closestEnemy.pos <= dog.range);
+                let isBaseInRange = (dog.pos - 60 <= dog.range * 0.75);
+
+                if (isEnemyInRange && closestEnemy) {
+                    if (!dog.lastAtkTime || Date.now() - dog.lastAtkTime > 1000) {
+                        closestEnemy.hp -= dog.atk; if (closestEnemy.hp <= 0) closestEnemy.hp = 0; closestEnemy.element.querySelector('.hp-bar').innerText = `🩸${closestEnemy.hp}`; dog.lastAtkTime = Date.now();
+                    }
+                } else if (!isEnemyInRange && dog.pos > 60) {
+                    dog.pos -= dog.speed; dog.element.style.left = dog.pos + 'px';
+                } else if (activeCats.length === 0 && isBaseInRange) {
+                    if (!dog.lastAtkTime || Date.now() - dog.lastAtkTime > 1000) {
+                        myBaseHp -= dog.atk; if (myBaseHp < 0) myBaseHp = 0; myBaseHpDisplay.innerText = `HP: ${myBaseHp}`; dog.lastAtkTime = Date.now(); checkGameOver();
+                    }
+                }
+            });
+            activeCats.forEach(cat => { if (cat.hp <= 0 && cat.element) cat.element.remove(); }); activeDogs.forEach(dog => { if (dog.hp <= 0 && dog.element) dog.element.remove(); });
+            activeCats = activeCats.filter(cat => cat.hp > 0); activeDogs = activeDogs.filter(dog => dog.hp > 0);
+        }, 50);
+
+        function checkGameOver() {
+            if (enemyBaseHp <= 0) { document.body.innerHTML = "<h1 style='color: #4CAF50; font-size: 36px; margin-top: 100px;'>🎉 藍方幾何軍團獲得全面勝利！</h1>"; }
+            else if (myBaseHp <= 0) { document.body.innerHTML = "<h1 style='color: #f44336; font-size: 36px; margin-top: 100px;'>❌ 核心堡壘失守，紅方三角形獲勝...</h1>"; }
+        }
+        function upgradeWallet() { if (isPaused) return; if (money >= walletCost) { money -= walletCost; walletLv++; moneyTick += 3; walletCost *= 2; walletLevel.innerText = walletLv; speedDisplay.innerText = moneyTick * 10; walletBtn.innerText = `升級能量核心 (花費 ${walletCost})`; } }
+        function upgradeBaseHp() { if (isPaused) return; if (money >= baseHpCost) { money -= baseHpCost; baseHpLv++; myBaseMaxHp += 200; myBaseHp = myBaseMaxHp; baseHpCost = Math.round(baseHpCost * 1.8); myBaseHpDisplay.innerText = `HP: ${myBaseHp}`; baseHpBtn.innerText = `強化我方基底血量 Lv.${baseHpLv} (花費 ${baseHpCost})`; } }
+    </script>
+</body>
+</html>
+
